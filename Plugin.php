@@ -2,12 +2,12 @@
 /**
  * 评论回复通过 MailGun 发送邮件提醒
  *
- * @package CommentMailPlus
- * @author oott123
- * @version 0.0.4
- * @link http://oott123.com
+ * @package Comment2MailGun
+ * @author kane
+ * @version 1.0.5
+ * @link https://github.com/Vndroid/Comment2MailGun
  */
-class CommentMailPlus_Plugin implements Typecho_Plugin_Interface {
+class Comment2MailGun_Plugin implements Typecho_Plugin_Interface {
     /**
      * 激活插件方法,如果激活失败,直接抛出异常
      *
@@ -19,8 +19,8 @@ class CommentMailPlus_Plugin implements Typecho_Plugin_Interface {
         if (!function_exists('curl_init')) {
             throw new Typecho_Plugin_Exception(_t('检测到当前 PHP 环境没有 cURL 组件, 无法正常使用此插件'));
         }
-        Helper::addAction('comment-mail-plus', 'CommentMailPlus_Action');
-        Typecho_Plugin::factory('Widget_Feedback')->finishComment = array('CommentMailPlus_Plugin', 'toMail');
+        Helper::addAction('comment-mail-plus', 'Comment2MailGun_Action');
+        Typecho_Plugin::factory('Widget_Feedback')->finishComment = array('Comment2MailGun_Plugin', 'toMail');
         return _t('请到设置面板正确配置 MailGun 才可正常工作。');
     }
 
@@ -60,8 +60,8 @@ class CommentMailPlus_Plugin implements Typecho_Plugin_Interface {
                     'to_guest' => '评论被回复时，发邮件通知评论者',
                     'to_me'=>'自己回复自己的评论时（同时针对博主和访客），发邮件通知',
                     'to_log' => '记录邮件发送日志'),
-                array('to_owner','to_guest'), '其他设置',_t('如果勾选“记录邮件发送日志”选项，则会在 ./CommentMailPlus/logs/mail_log.php 中记录发送信息。<br />
-                    关键性错误日志将自动记录到 ./CommentMailPlus/logs/error_log.php 中。<br />
+                array('to_owner','to_guest'), '其他设置',_t('如果勾选“记录邮件发送日志”选项，则会在 ./Comment2MailGun/logs/mail_log.php 中记录发送信息。<br />
+                    关键性错误日志将自动记录到 ./Comment2MailGun/logs/error_log.php 中。<br />
                     '));
         $form->addInput($other->multiMode());
         $key = new Typecho_Widget_Helper_Form_Element_Text('key', NULL, 'xxxxxxxxxxxxxxxxxxx-xxxxxx-xxxxxx',
@@ -101,73 +101,73 @@ class CommentMailPlus_Plugin implements Typecho_Plugin_Interface {
      * 组合邮件内容
      *
      * @access public
-     * @param $post 调用参数
+     * @param $post
      * @return void
      */
     public static function toMail($post) {
         //发送邮件
-        $settings=Helper::options()->plugin('CommentMailPlus');
+        $settings=Helper::options()->plugin('Comment2MailGun');
         $options = Typecho_Widget::widget('Widget_Options');
         //邮件模板变量
-        $tempinfo['site']      = $options->title;
-        $tempinfo['siteUrl']   = $options->siteUrl;
-        $tempinfo['title']     = $post->title;
-        $tempinfo['cid']       = $post->cid;
-        $tempinfo['coid']      = $post->coid;
-        $tempinfo['created']   = $post->created;
-        $tempinfo['timezone']  = $options->timezone;
-        $tempinfo['author']    = $post->author;
-        $tempinfo['authorId']  = $post->authorId;
-        $tempinfo['ownerId']   = $post->ownerId;
-        $tempinfo['mail']      = $post->mail;
-        $tempinfo['ip']        = $post->ip;
-        $tempinfo['title']     = $post->title;
-        $tempinfo['text']      = $post->text;
-        $tempinfo['permalink'] = $post->permalink;
-        $tempinfo['status']    = $post->status;
-        $tempinfo['parent']    = $post->parent;
-        $tempinfo['manage']    = $options->siteUrl."admin/manage-comments.php";
+        $tempInfo['site']      = $options->title;
+        $tempInfo['siteUrl']   = $options->siteUrl;
+        $tempInfo['title']     = $post->title;
+        $tempInfo['cid']       = $post->cid;
+        $tempInfo['coid']      = $post->coid;
+        $tempInfo['created']   = $post->created;
+        $tempInfo['timezone']  = $options->timezone;
+        $tempInfo['author']    = $post->author;
+        $tempInfo['authorId']  = $post->authorId;
+        $tempInfo['ownerId']   = $post->ownerId;
+        $tempInfo['mail']      = $post->mail;
+        $tempInfo['ip']        = $post->ip;
+        $tempInfo['title']     = $post->title;
+        $tempInfo['text']      = $post->text;
+        $tempInfo['permalink'] = $post->permalink;
+        $tempInfo['status']    = $post->status;
+        $tempInfo['parent']    = $post->parent;
+        $tempInfo['manage']    = $options->siteUrl."admin/manage-comments.php";
         $_db = Typecho_Db::get();
         $original = $_db->fetchRow($_db::get()->select('author', 'mail', 'text')
                     ->from('table.comments')
-                    ->where('coid = ?', $tempinfo['parent']));
+                    ->where('coid = ?', $tempInfo['parent']));
         //var_dump($original);die();
 
         //判断发送
         //1.发送博主邮件
         //无需判断，先发为敬。
-        if(in_array('to_owner', $settings->other) && in_array($tempinfo['status'], $settings->status)){
-            $this_mail = $tempinfo['mail'];
+        if(in_array('to_owner', $settings->other) && in_array($tempInfo['status'], $settings->status)){
+            $this_mail = $tempInfo['mail'];
             $to_mail = $settings->mail;
             if(!$to_mail){
-                Typecho_Widget::widget('Widget_Users_Author@' . $tempinfo['cid'], array('uid' => $tempinfo['authorId']))->to($user);
+                Typecho_Widget::widget('Widget_Users_Author@' . $tempInfo['cid'], array('uid' => $tempInfo['authorId']))->to($user);
                 $to_mail = $user->mail;
             }
             if($this_mail != $to_mail || in_array('to_me',$settings->other)){
                 //判定可以发送邮件
                 $from_mail = $settings->mailAddress;
-                $title = self::_getTitle(false,$settings,$tempinfo);
-                $body = self::_getHtml(false,$tempinfo);
+                $title = self::_getTitle(false,$settings,$tempInfo);
+                $body = self::_getHtml(false,$tempInfo);
                 self::_sendMail($to_mail,$from_mail,$title,$body,$settings);
             }
         }
         //2.发送评论者邮件
         //判断是否为回复评论，是则发，否则跳。
         if (!empty($original)){
-            $tempinfo['originalMail'] = $original['mail'];
-            $tempinfo['originalText'] = $original['text'];
-            $tempinfo['originalAuthor'] = $original['author'];
-            if(in_array('to_guest', $settings->other) && 'approved'==$tempinfo['status'] && $tempinfo['originalMail']){
-                $to_mail = $tempinfo['originalMail'];
+            $tempInfo['originalMail'] = $original['mail'];
+            $tempInfo['originalText'] = $original['text'];
+            $tempInfo['originalAuthor'] = $original['author'];
+            if(in_array('to_guest', $settings->other) && 'approved'==$tempInfo['status'] && $tempInfo['originalMail']){
+                $to_mail = $tempInfo['originalMail'];
                 $from_mail = $settings->mailAddress;
-                $title = self::_getTitle(true,$settings,$tempinfo);
-                $body = self::_getHtml(true,$tempinfo);
+                $title = self::_getTitle(true,$settings,$tempInfo);
+                $body = self::_getHtml(true,$tempInfo);
                 self::_sendMail($to_mail,$from_mail,$title,$body,$settings);
             }
         }
-        
+
     }
-    public static function _getTitle($toGuest,$settings,$tempinfo){
+    public static function _getTitle($toGuest,$settings,$tempInfo){
         //获取发送标题
         $title = '';
         if($toGuest){
@@ -175,17 +175,32 @@ class CommentMailPlus_Plugin implements Typecho_Plugin_Interface {
         }else{
             $title = $title = $settings->titleForOwner;
         }
-        return str_replace(array('{title}','{site}'), array($tempinfo['title'],$tempinfo['site']), $title);
+        return str_replace(array('{title}','{site}'), array($tempInfo['title'],$tempInfo['site']), $title);
     }
-    public static function _getHtml($toGuest,$tempinfo){
+    public static function _hitokoto()
+    {
+        $url = 'https://international.v1.hitokoto.cn/';
+        $yy = curl_init();
+        curl_setopt($yy, CURLOPT_SSL_VERIFYPEER, false);
+        curl_setopt($yy, CURLOPT_SSL_VERIFYHOST, false);
+        curl_setopt($yy, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($yy, CURLOPT_URL, $url);
+        $result = curl_exec($yy);
+        $yiyan = json_decode($result, true);
+        if (!empty($yiyan['hitokoto'])) {
+            return $yiyan;
+        }
+    }
+    public static function _getHtml($toGuest,$tempInfo){
         //获取发送模板
         $dir = dirname(__FILE__).'/';
-        $time = date("Y-m-d H:i:s",$tempinfo['created']+$tempinfo['timezone']);
+        $time = date("Y-m-d H:i:s",$tempInfo['created']+$tempInfo['timezone']);
         $search=$replace=array();
         if($toGuest){
             $dir.='guest.html';
-            $search = array('{site}','{siteUrl}', '{title}','{author_p}','{author}','{mail}','{permalink}','{text}','{text_p}','{time}');
-            $replace = array($tempinfo['site'],$tempinfo['siteUrl'],$tempinfo['title'],$tempinfo['originalAuthor'],$tempinfo['author'], $tempinfo['mail'],$tempinfo['permalink'],$tempinfo['text'],$tempinfo['originalText'],$time);
+            $yiyan = self::_hitokoto();
+            $search = array('{site}','{siteUrl}', '{title}','{author_p}','{author}','{mail}','{permalink}','{text}','{text_p}','{time}','{yiyanbody}','{yiyanfrom}');
+            $replace = array($tempInfo['site'],$tempInfo['siteUrl'],$tempInfo['title'],$tempInfo['originalAuthor'],$tempInfo['author'], $tempInfo['mail'],$tempInfo['permalink'],$tempInfo['text'],$tempInfo['originalText'],$time,$yiyan['hitokoto'],$yiyan['from']);
         }else{
             $dir.='owner.html';
             $status = array(
@@ -193,8 +208,8 @@ class CommentMailPlus_Plugin implements Typecho_Plugin_Interface {
                 "waiting"  => '待审',
                 "spam"     => '垃圾'
             );
-            $search = array('{site}','{siteUrl}', '{title}','{author}','{ip}','{mail}','{permalink}','{manage}','{text}','{time}','{status}');
-            $replace = array($tempinfo['site'],$tempinfo['siteUrl'],$tempinfo['title'],$tempinfo['author'],$tempinfo['ip'],$tempinfo['mail'],$tempinfo['permalink'],$tempinfo['manage'],$tempinfo['text'],$time,$status[$tempinfo['status']]);
+            $search = array('{site}','{siteUrl}','{title}','{author}','{ip}','{mail}','{permalink}','{manage}','{text}','{time}','{status}');
+            $replace = array($tempInfo['site'],$tempInfo['siteUrl'],$tempInfo['title'],$tempInfo['author'],$tempInfo['ip'],$tempInfo['mail'],$tempInfo['permalink'],$tempInfo['manage'],$tempInfo['text'],$time,$status[$tempInfo['status']]);
         }
         $html = file_get_contents($dir);
         return str_replace($search, $replace, $html);
@@ -232,7 +247,7 @@ class CommentMailPlus_Plugin implements Typecho_Plugin_Interface {
     }
     public static function _log($msg,$file='error'){
         //记录日志
-        $settings=Helper::options()->plugin('CommentMailPlus');
+        $settings=Helper::options()->plugin('Comment2MailGun');
         if(!in_array('to_log', $settings->other)) return false;
         //开发者模式
         if($file=='debug' && true) return false;
