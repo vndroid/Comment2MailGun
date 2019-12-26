@@ -1,4 +1,4 @@
-# CommentMailPlus
+# Comment2MailGun
 
 ## 评论邮件通知插件
 
@@ -20,7 +20,7 @@ $ cd typecho/usr/plugins/
 克隆插件文件
 
 ```bash
-$ git clone https://github.com/oott123/CommentMailPlus.git
+$ git clone https://github.com/Vndroid/Comment2MailGun.git
 ```
 
 在后台启用即可
@@ -35,7 +35,7 @@ $ git clone https://github.com/oott123/CommentMailPlus.git
 
 ### 感谢
 
-[@Cain](https://github.com/Vndroid)
+[@三三](https://github.com/oott123)
 
 ### 其它问题
 
