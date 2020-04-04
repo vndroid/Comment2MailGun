@@ -3,7 +3,7 @@
  * 评论回复通过 MailGun 发送邮件提醒
  *
  * @package Comment2MailGun
- * @author kane
+ * @author Kane
  * @version 1.0.5
  * @link https://github.com/Vndroid/Comment2MailGun
  */
