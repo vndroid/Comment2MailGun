@@ -109,25 +109,25 @@ class Comment2MailGun_Plugin implements Typecho_Plugin_Interface {
         $settings=Helper::options()->plugin('Comment2MailGun');
         $options = Typecho_Widget::widget('Widget_Options');
         //邮件模板变量
-        $tempInfo['site']      = $options->title;
-        $tempInfo['siteUrl']   = $options->siteUrl;
-        $tempInfo['title']     = $post->title;
-        $tempInfo['cid']       = $post->cid;
-        $tempInfo['coid']      = $post->coid;
-        $tempInfo['created']   = $post->created;
-        $tempInfo['timezone']  = $options->timezone;
-        $tempInfo['author']    = $post->author;
-        $tempInfo['authorId']  = $post->authorId;
-        $tempInfo['ownerId']   = $post->ownerId;
-        $tempInfo['mail']      = $post->mail;
-        $tempInfo['ip']        = $post->ip;
-        $tempInfo['title']     = $post->title;
-        $tempInfo['text']      = $post->text;
-        $tempInfo['permalink'] = $post->permalink;
-        $tempInfo['status']    = $post->status;
-        $tempInfo['parent']    = $post->parent;
-        $tempInfo['manage']    = $options->siteUrl."admin/manage-comments.php";
-        $tempInfo['years']     = date('Y');
+        $tempInfo['site']          = $options->title;
+        $tempInfo['siteUrl']       = $options->siteUrl;
+        $tempInfo['title']         = $post->title;
+        $tempInfo['cid']           = $post->cid;
+        $tempInfo['coid']          = $post->coid;
+        $tempInfo['created']       = $post->created;
+        $tempInfo['timezone']      = $options->timezone;
+        $tempInfo['author']        = $post->author;
+        $tempInfo['authorId']      = $post->authorId;
+        $tempInfo['ownerId']       = $post->ownerId;
+        $tempInfo['mail']          = $post->mail;
+        $tempInfo['ip']            = $post->ip;
+        $tempInfo['title']         = $post->title;
+        $tempInfo['text']          = $post->text;
+        $tempInfo['permalink']     = $post->permalink;
+        $tempInfo['status']        = $post->status;
+        $tempInfo['parent']        = $post->parent;
+        $tempInfo['manage']        = $options->siteUrl."admin/manage-comments.php";
+        $tempInfo['currentYear']   = date('Y');
         $_db = Typecho_Db::get();
         $original = $_db->fetchRow($_db::get()->select('author', 'mail', 'text')
                     ->from('table.comments')
@@ -200,8 +200,8 @@ class Comment2MailGun_Plugin implements Typecho_Plugin_Interface {
         if($toGuest){
             $dir.='guest.html';
             $yiyan = self::_hitokoto();
-            $search = array('{site}','{siteUrl}', '{title}','{author_p}','{author}','{mail}','{permalink}','{text}','{text_p}','{years}','{time}','{yiyanbody}','{yiyanfrom}');
-            $replace = array($tempInfo['site'],$tempInfo['siteUrl'],$tempInfo['title'],$tempInfo['originalAuthor'],$tempInfo['author'], $tempInfo['mail'],$tempInfo['permalink'],$tempInfo['text'],$tempInfo['originalText'],$tempInfo['year'],$time,$yiyan['hitokoto'],$yiyan['from']);
+            $search = array('{site}','{siteUrl}','{title}','{author_p}','{author}','{mail}','{permalink}','{text}','{text_p}','{currentYear}','{time}','{yiyanbody}','{yiyanfrom}');
+            $replace = array($tempInfo['site'],$tempInfo['siteUrl'],$tempInfo['title'],$tempInfo['originalAuthor'],$tempInfo['author'], $tempInfo['mail'],$tempInfo['permalink'],$tempInfo['text'],$tempInfo['originalText'],$tempInfo['currentYear'],$time,$yiyan['hitokoto'],$yiyan['from']);
         }else{
             $dir.='owner.html';
             $status = array(
@@ -209,8 +209,8 @@ class Comment2MailGun_Plugin implements Typecho_Plugin_Interface {
                 "waiting"  => '待审',
                 "spam"     => '垃圾'
             );
-            $search = array('{site}','{siteUrl}','{title}','{author}','{ip}','{mail}','{permalink}','{manage}','{text}','{time}','{status}');
-            $replace = array($tempInfo['site'],$tempInfo['siteUrl'],$tempInfo['title'],$tempInfo['author'],$tempInfo['ip'],$tempInfo['mail'],$tempInfo['permalink'],$tempInfo['manage'],$tempInfo['text'],$time,$status[$tempInfo['status']]);
+            $search = array('{site}','{siteUrl}','{title}','{author}','{ip}','{mail}','{permalink}','{manage}','{text}','{currentYear}','{time}','{status}');
+            $replace = array($tempInfo['site'],$tempInfo['siteUrl'],$tempInfo['title'],$tempInfo['author'],$tempInfo['ip'],$tempInfo['mail'],$tempInfo['permalink'],$tempInfo['manage'],$tempInfo['text'],$tempInfo['currentYear'],$time,$status[$tempInfo['status']]);
         }
         $html = file_get_contents($dir);
         return str_replace($search, $replace, $html);
