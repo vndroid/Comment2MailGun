@@ -1,26 +1,39 @@
-<div
-    style="width: 550px;height: auto;border-radius: 5px;margin:0 auto;border:1px solid #ffb0b0;box-shadow: 0px 0px 20px #888888;position: relative;">
-    <div
-        style="background-image: url('https://wave.md/mail.svg');width:550px;height: 250px;background-size: cover;background-repeat: no-repeat;border-radius: 5px 5px 0px 0px;"></div>
-    <div
-        style="background-color:white;line-height:180%;padding:0 15px 12px;width:520px;color:#555555;font-family:'Century Gothic','Trebuchet MS','Hiragino Sans GB','Microsoft Yahei','Tahoma','Helvetica','Arial','SimSun',sans-serif;font-size:12px;margin: 10px auto 0px;">
-        <h2 style="border-bottom:1px solid #DDD;font-size:14px;font-weight:normal;padding:13px 0 10px 8px;"><span
-            style="color: #12ADDB;font-weight: bold;">&gt; </span>您的文章<a style="text-decoration:none;color: #12ADDB;"
-                                                                         href="{permalink}"
-                                                                         target="_blank">《{title}》</a>有新的评论</h2>
-        <div style="padding:0 12px 0 12px;margin-top:18px">
-            <p>时间：<span style="border-bottom:1px dashed #ccc;" t="5" times=" 20:42">{time}</span></p>
-            <p><strong>{author}</strong>&nbsp;给您的评论：</p>
-            <p style="background-color: #f5f5f5;border: 0px solid #DDD;padding: 10px 15px;margin:18px 0">{text}</p>
-            <p>其他信息：</p>
-            <p style="background-color: #f5f5f5;border: 0px solid #DDD;padding: 10px 15px;margin:18px 0">来源：{ip}<br/>邮箱：<a
-                href="mailto:{mail}">{mail}</a><br/>状态：{status} [<a href='{manage}' target='_blank'>管理评论</a>]</p>
-        </div>
-    </div>
-    <a style="text-decoration: none;color: rgb(255, 255, 255);width: 40%;text-align: center;background-color: rgb(145, 165, 165);height: 40px;line-height: 40px;box-shadow: 3px 3px 3px rgba(0, 0, 0, 0.3);display: block;margin: auto;"
-       href="{permalink}" target="_blank">查看评论的完整內容</a>
-    <div
-        style="color:#8c8c8c;font-family: 'Century Gothic','Trebuchet MS','Hiragino Sans GB','Microsoft Yahei','Tahoma','Helvetica','Arial','SimSun',sans-serif;font-size: 10px;width: 100%;text-align: center;">
-        <p>Copyright &copy; {currentYear} {site} All rights reserved.</p>
-    </div>
-</div>
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset="utf-8" />
+		<title>收到新的评论</title>
+	</head>
+	<body>
+		<div style="width: 550px;height: auto;border-radius: 5px;margin:0 auto;border:1px solid #ffb0b0;box-shadow: 0px 0px 20px #888888;position: relative;">
+			<div style="background-image: url('https://wave.md/mail.svg'); width:550px;height: 250px;background-size: cover;background-repeat: no-repeat;border-radius: 5px 5px 0px 0px;"></div>
+			<div style="background-color:white;line-height:180%;padding:0 15px 12px;width:520px;color:#555555;font-family:'Century Gothic','Trebuchet MS','Hiragino Sans GB','Microsoft Yahei','Tahoma','Helvetica','Arial','SimSun',sans-serif;font-size:12px;margin: 10px auto 0px;">
+				<h2 style="border-bottom:1px solid #DDD;font-size:14px;font-weight:normal;padding:13px 0 10px 8px;"><span style="color: #12ADDB;font-weight: bold;">&gt;
+					</span>您的文章<a style="text-decoration:none;color: #12ADDB;" href="{permalink}" target="_blank">《{title}》</a>收到新的评论</h2>
+				<div style="padding:0 12px 0 12px;margin-top:18px">
+					<p>时间：<span style="border-bottom:1px dashed #ccc;" t="5" times=" 20:42">{time}</span></p>
+					<p><strong>{author}</strong>&nbsp;给您的评论：</p>
+					<p style="background-color: #f5f5f5;border: 0px solid #DDD;padding: 10px 15px;margin:18px 0">{text}</p>
+					<p>其他信息：</p>
+					<p style="background-color: #f5f5f5;border: 0px solid #DDD;padding: 10px 15px;margin:18px 0">来源：{ip}<br />邮箱：<a
+						 href="mailto:{mail}">{mail}</a><br />状态：{status}
+						[<a href='{manage}' target='_blank'>管理评论</a>]</p>
+				</div>
+			</div>
+			<a style="text-decoration: none;color: rgb(255, 255, 255);width: 40%;text-align: center;background-color: rgb(145, 165, 165);height: 40px;line-height: 40px;box-shadow: 3px 3px 3px rgba(0, 0, 0, 0.3);display: block;margin: auto;"
+			 href="{permalink}" target="_blank">查看评论的完整內容</a>
+			<div style="color:#8c8c8c;font-family: 'Century Gothic','Trebuchet MS','Hiragino Sans GB','Microsoft Yahei','Tahoma','Helvetica','Arial','SimSun',sans-serif;font-size: 10px;width: 100%;text-align: center;">
+				<p>Copyright &copy; {currentYear} {site} All rights reserved.</p>
+			</div>
+		</div>
+		<div style="display: none;font-size: 12px; line-height: 24px;">
+			<table border="0" cellspacing="0" cellpadding="0" align="center">
+				<tbody>
+					<tr>
+						<td>这是博客系统发送的提醒邮件，如果您不想看到此邮件可以屏蔽发件地址</td>
+					</tr>
+				</tbody>
+			</table>
+		</div>
+	</body>
+</html>

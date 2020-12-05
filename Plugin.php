@@ -200,7 +200,7 @@ class Comment2MailGun_Plugin implements Typecho_Plugin_Interface {
         if($toGuest){
             $dir.='guest.html';
             $yiyan = self::_hitokoto();
-            $search = array('{site}','{siteUrl}','{title}','{author_p}','{author}','{mail}','{permalink}','{text}','{text_p}','{currentYear}','{time}','{yiyanbody}','{yiyanfrom}');
+            $search = array('{site}','{siteUrl}','{title}','{author_p}','{author}','{mail}','{permalink}','{text}','{text_p}','{currentYear}','{time}','{yiyanBody}','{yiyanFrom}');
             $replace = array($tempInfo['site'],$tempInfo['siteUrl'],$tempInfo['title'],$tempInfo['originalAuthor'],$tempInfo['author'], $tempInfo['mail'],$tempInfo['permalink'],$tempInfo['text'],$tempInfo['originalText'],$tempInfo['currentYear'],$time,$yiyan['hitokoto'],$yiyan['from']);
         }else{
             $dir.='owner.html';
