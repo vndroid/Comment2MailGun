@@ -200,7 +200,7 @@ class Comment2MailGun_Plugin implements Typecho_Plugin_Interface {
         if($toGuest){
             $dir.='guest.html';
             $yiyan = self::_hitokoto();
-            $search = array('{site}','{siteUrl}','{title}','{author_p}','{author}','{mail}','{permaLink}','{text}','{text_p}','{currentYear}','{time}','{yiyanBody}','{yiyanFrom}');
+            $search = array('{site}','{siteUrl}','{title}','{originAuthor}','{author}','{mail}','{permaLink}','{repyComment}','{myComment}','{currentYear}','{time}','{yiyanBody}','{yiyanFrom}');
             $replace = array($tempInfo['site'],$tempInfo['siteUrl'],$tempInfo['title'],$tempInfo['originalAuthor'],$tempInfo['author'], $tempInfo['mail'],$tempInfo['permalink'],$tempInfo['text'],$tempInfo['originalText'],$tempInfo['currentYear'],$time,$yiyan['hitokoto'],$yiyan['from']);
         }else{
             $dir.='owner.html';
@@ -209,7 +209,7 @@ class Comment2MailGun_Plugin implements Typecho_Plugin_Interface {
                 "waiting"  => '待审',
                 "spam"     => '垃圾'
             );
-            $search = array('{site}','{siteUrl}','{title}','{author}','{ip}','{mail}','{permaLink}','{manage}','{text}','{currentYear}','{time}','{status}');
+            $search = array('{site}','{siteUrl}','{title}','{author}','{ip}','{mail}','{permaLink}','{manage}','{comment}','{currentYear}','{time}','{status}');
             $replace = array($tempInfo['site'],$tempInfo['siteUrl'],$tempInfo['title'],$tempInfo['author'],$tempInfo['ip'],$tempInfo['mail'],$tempInfo['permalink'],$tempInfo['manage'],$tempInfo['text'],$tempInfo['currentYear'],$time,$status[$tempInfo['status']]);
         }
         $html = file_get_contents($dir);
