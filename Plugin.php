@@ -4,7 +4,7 @@
  *
  * @package Comment2MailGun
  * @author Kane
- * @version 1.0.5
+ * @version 1.1.0
  * @link https://github.com/Vndroid/Comment2MailGun
  */
 class Comment2MailGun_Plugin implements Typecho_Plugin_Interface {
