@@ -3,9 +3,9 @@
  * 评论回复通过 MailGun 发送邮件提醒
  *
  * @package Comment2MailGun
- * @author Kane
+ * @author Vex
  * @version 1.1.0
- * @link https://github.com/Vndroid/Comment2MailGun
+ * @link https://github.com/vndroid/Comment2MailGun
  */
 class Comment2MailGun_Plugin implements Typecho_Plugin_Interface {
     /**
