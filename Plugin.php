@@ -252,13 +252,23 @@ class Comment2MailGun_Plugin implements Typecho_Plugin_Interface {
         if(!in_array('to_log', $settings->other)) return false;
         //开发者模式
         if($file=='debug' && true) return false;
-        $filename = dirname(__FILE__).'/logs/'.$file.'_log.php';
-        if(!is_file($filename)){
-            file_put_contents($filename, '<?php $log = <<<LOG');
+        $log_dir = dirname(__FILE__) . '/logs';
+        $filename = $log_dir . '/' . $file . '_log.php';
+        //检查日志目录是否存在且可写，不存在则使用临时目录
+        if (!is_dir($log_dir) || !is_writable($log_dir)) {
+            $filename = '/tmp/mailgun_' . $file . '.log';
         }
-        $log = fopen($filename, 'a');
-        fwrite($log, date('[Y-m-d H:i:s]').' '.$msg.PHP_EOL);
-        fclose($log);
-        return true;
+        // 仅 logs 目录下的 .php 文件写入 PHP 头
+        if (strpos($filename, '_log.php') !== false && !is_file($filename)) {
+            file_put_contents($filename, "<?php \$log = <<<LOG\n");
+        }
+
+        $log = @fopen($filename, 'a');
+        if ($log) {
+            fwrite($log, date('[Y-m-d H:i:s]') . ' ' . $msg . PHP_EOL);
+            fclose($log);
+            return true;
+        }
+        return false;
     }
 }
