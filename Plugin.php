@@ -192,17 +192,29 @@ class Plugin implements PluginInterface
         }
 
     }
-    public static function _getTitle($toGuest,$settings,$tempInfo){
-        //获取发送标题
-        $title = '';
-        if($toGuest){
-            $title = $settings->titleForGuest;
-        }else{
-            $title = $title = $settings->titleForOwner;
-        }
-        return str_replace(array('{title}','{site}'), array($tempInfo['title'],$tempInfo['site']), $title);
+
+    /**
+     * 获取邮件标题
+     *
+     * @access public
+     * @param bool $toGuest
+     * @param $settings
+     * @param array $tempInfo
+     * @return string
+     */
+    public static function _getTitle(bool $toGuest, $settings, array $tempInfo): string
+    {
+        $title = (string)($toGuest ? $settings->titleForGuest : $settings->titleForOwner);
+        return str_replace(['{title}', '{site}'], [$tempInfo['title'], $tempInfo['site']], $title);
     }
-    public static function _hitokoto()
+
+    /**
+     * 获取一言随机名言
+     *
+     * @access public
+     * @return array{hitokoto: string, from: string}
+     */
+    public static function _hitokoto(): array
     {
         $url = 'https://international.v1.hitokoto.cn/';
         $yy = curl_init();
@@ -211,52 +223,81 @@ class Plugin implements PluginInterface
         curl_setopt($yy, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($yy, CURLOPT_URL, $url);
         $result = curl_exec($yy);
+        curl_close($yy);
+
+        $fallback = ['hitokoto' => '', 'from' => ''];
+
+        if (!is_string($result) || empty($result)) {
+            return $fallback;
+        }
+
         $yiyan = json_decode($result, true);
-        if (!empty($yiyan['hitokoto'])) {
-            return $yiyan;
+        if (!is_array($yiyan) || empty($yiyan['hitokoto'])) {
+            return $fallback;
         }
-        return null;
-    }
-    public static function _getHtml($toGuest,$tempInfo){
-        //获取发送模板
-        $dir = dirname(__FILE__).'/';
-        $time = date("Y-m-d H:i:s",$tempInfo['created']+$tempInfo['timezone']);
-        $search=$replace=array();
-        if($toGuest){
-            $dir.='guest.html';
-            $yiyan = self::_hitokoto();
-            $search = array('{site}','{siteUrl}','{title}','{originAuthor}','{author}','{mail}','{permaLink}','{repyComment}','{myComment}','{currentYear}','{time}','{yiyanBody}','{yiyanFrom}');
-            $replace = array($tempInfo['site'],$tempInfo['siteUrl'],$tempInfo['title'],$tempInfo['originalAuthor'],$tempInfo['author'], $tempInfo['mail'],$tempInfo['permalink'],$tempInfo['text'],$tempInfo['originalText'],$tempInfo['currentYear'],$time,$yiyan['hitokoto'],$yiyan['from']);
-        }else{
-            $dir.='owner.html';
-            $status = array(
-                "approved" => '通过',
-                "waiting"  => '待审',
-                "spam"     => '垃圾'
-            );
-            $search = array('{site}','{siteUrl}','{title}','{author}','{ip}','{mail}','{permaLink}','{manage}','{comment}','{currentYear}','{time}','{status}');
-            $replace = array($tempInfo['site'],$tempInfo['siteUrl'],$tempInfo['title'],$tempInfo['author'],$tempInfo['ip'],$tempInfo['mail'],$tempInfo['permalink'],$tempInfo['manage'],$tempInfo['text'],$tempInfo['currentYear'],$time,$status[$tempInfo['status']]);
-        }
-        $html = file_get_contents($dir);
-        return str_replace($search, $replace, $html);
+
+        return [
+            'hitokoto' => (string)$yiyan['hitokoto'],
+            'from'     => (string)($yiyan['from'] ?? ''),
+        ];
     }
 
-    public static function _sendMail($to_mail,$from_mail,$title,$body,$settings)
+    /**
+     * 匹配邮件模板并替换变量
+     *
+     * @access public
+     * @param bool $toGuest
+     * @param array $tempInfo
+     * @return string
+     */
+    public static function _getHtml(bool $toGuest, array $tempInfo): string
     {
-        //发送邮件
+        //获取发送模板
+        $dir = dirname(__FILE__) . '/';
+        $time = date("Y-m-d H:i:s", $tempInfo['created'] + $tempInfo['timezone']);
+        if ($toGuest) {
+            $dir .= 'guest.html';
+            $yiyan = self::_hitokoto();
+            $search = array('{site}', '{siteUrl}', '{title}', '{originAuthor}', '{author}', '{mail}', '{permaLink}', '{repyComment}', '{myComment}', '{currentYear}', '{time}', '{yiyanBody}', '{yiyanFrom}');
+            $replace = array($tempInfo['site'], $tempInfo['siteUrl'], $tempInfo['title'], $tempInfo['originalAuthor'], $tempInfo['author'], $tempInfo['mail'], $tempInfo['permalink'], $tempInfo['text'], $tempInfo['originalText'], $tempInfo['currentYear'], $time, $yiyan['hitokoto'], $yiyan['from']);
+        } else {
+            $dir .= 'owner.html';
+            $status = array(
+                "approved" => '通过',
+                "waiting" => '待审',
+                "spam" => '垃圾'
+            );
+            $search = array('{site}', '{siteUrl}', '{title}', '{author}', '{ip}', '{mail}', '{permaLink}', '{manage}', '{comment}', '{currentYear}', '{time}', '{status}');
+            $replace = array($tempInfo['site'], $tempInfo['siteUrl'], $tempInfo['title'], $tempInfo['author'], $tempInfo['ip'], $tempInfo['mail'], $tempInfo['permalink'], $tempInfo['manage'], $tempInfo['text'], $tempInfo['currentYear'], $time, $status[$tempInfo['status']]);
+        }
+        $html = file_get_contents($dir);
+        if ($html === false) {
+            return '';
+        }
+        return (string)str_replace($search, $replace, $html);
+    }
+
+    /**
+     * 邮件发送方法
+     *
+     * @access public
+     * @throws Exception
+     */
+    public static function _sendMail($to_mail, $from_mail, $title, $body, $settings): void
+    {
         //self::_log($to_mail,'debug');return;
         $api_key = $settings->key;
         $domain = $settings->domain;
-        $from_mail = $settings->senderName.' <'.$from_mail.'>';
+        $from_mail = $settings->senderName . ' <' . $from_mail . '>';
         $postData = array(
             'from' => $from_mail,
             'to' => $to_mail,
             'subject' => $title,
             'html' => $body,
-            );
-        $url = 'https://api.mailgun.net/v3/'.$domain.'/messages';
+        );
+        $url = 'https://api.mailgun.net/v3/' . $domain . '/messages';
         $ch = curl_init();
-        curl_setopt($ch, CURLOPT_USERPWD,'api:'.$api_key);
+        curl_setopt($ch, CURLOPT_USERPWD, 'api:' . $api_key);
         curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
         curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
@@ -264,14 +305,14 @@ class Plugin implements PluginInterface
         curl_setopt($ch, CURLOPT_URL, $url);
         curl_setopt($ch, CURLOPT_POSTFIELDS, $postData);
         curl_setopt($ch, CURLOPT_HEADER, true);
-        self::_log('curl prepareing...'.print_r(curl_getinfo($ch),1),'debug');
+        self::_log('curl preparing...' . print_r(curl_getinfo($ch), 1), 'debug');
         $result = curl_exec($ch);
-        self::_log('API return...'.$result,'debug');
+        self::_log('API return...' . $result, 'debug');
         $headerSize = curl_getinfo($ch, CURLINFO_HEADER_SIZE);
         $result = substr($result, $headerSize);
-        $res = json_decode($result,1);
-        self::_log('curl excuted...'.print_r(curl_getinfo($ch),1),'debug');
-        self::_log($to_mail.' '.'Sending: '.$res['message']);
+        $res = json_decode($result, 1);
+        self::_log('curl executed...' . print_r(curl_getinfo($ch), 1), 'debug');
+        self::_log($to_mail . ' ' . 'Sending: ' . $res['message']);
     }
     public static function _log($msg,$file='error'){
         //记录日志
