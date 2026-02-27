@@ -314,12 +314,22 @@ class Plugin implements PluginInterface
         self::_log('curl executed...' . print_r(curl_getinfo($ch), 1), 'debug');
         self::_log($to_mail . ' ' . 'Sending: ' . $res['message']);
     }
-    public static function _log($msg,$file='error'){
+
+    /**
+     * 日志记录方法
+     *
+     * @param $msg
+     * @param string $file
+     * @return bool
+     * @throws Exception
+     */
+    public static function _log($msg, string $file = 'error'): bool
+    {
         //记录日志
-        $settings=Helper::options()->plugin('Comment2MailGun');
-        if(!in_array('to_log', $settings->other)) return false;
+        $settings = Helper::options()->plugin('Comment2MailGun');
+        if (!in_array('to_log', $settings->other)) return false;
         //开发者模式
-        if($file=='debug' && true) return false;
+        if ($file === 'debug' && true) return false;
         $log_dir = dirname(__FILE__) . '/logs';
         $filename = $log_dir . '/' . $file . '_log.php';
         //检查日志目录是否存在且可写，不存在则使用临时目录
@@ -327,7 +337,7 @@ class Plugin implements PluginInterface
             $filename = '/tmp/mailgun_' . $file . '.log';
         }
         // 仅 logs 目录下的 .php 文件写入 PHP 头
-        if (strpos($filename, '_log.php') !== false && !is_file($filename)) {
+        if (str_contains($filename, '_log.php') && !is_file($filename)) {
             file_put_contents($filename, "<?php \$log = <<<LOG\n");
         }
 
