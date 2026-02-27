@@ -1,87 +1,111 @@
 <?php
+
+namespace TypechoPlugin\Comment2MailGun;
+
+use Typecho\Plugin\PluginInterface;
+use Typecho\Plugin\Exception;
+use Typecho\Widget\Helper\Form;
+use Typecho\Widget\Helper\Form\Element\Text;
+use Typecho\Widget\Helper\Form\Element\Checkbox;
+use Utils\Helper;
+
+if (!defined('__TYPECHO_ROOT_DIR__')) {
+    exit;
+}
+
 /**
  * 评论回复通过 MailGun 发送邮件提醒
  *
  * @package Comment2MailGun
  * @author Vex
- * @version 1.1.0
+ * @version 1.2.0
  * @link https://github.com/vndroid/Comment2MailGun
  */
-class Comment2MailGun_Plugin implements Typecho_Plugin_Interface {
+class Plugin implements PluginInterface
+{
     /**
      * 激活插件方法,如果激活失败,直接抛出异常
      *
      * @access public
-     * @return void
-     * @throws Typecho_Plugin_Exception
+     * @return string
+     * @throws Exception
      */
-    public static function activate() {
-        if (!function_exists('curl_init')) {
-            throw new Typecho_Plugin_Exception(_t('检测到当前 PHP 环境没有 cURL 组件, 无法正常使用此插件'));
+    public static function activate(): string
+    {
+        if (!extension_loaded('curl')) {
+            throw new Exception(_t('检测到当前 PHP 环境没有 cURL 组件, 无法正常使用此插件'));
         }
-        Helper::addAction('comment-mail-plus', 'Comment2MailGun_Action');
-        Typecho_Plugin::factory('Widget_Feedback')->finishComment = array('Comment2MailGun_Plugin', 'toMail');
-        return _t('请到设置面板正确配置 MailGun 才可正常工作。');
+        if (!function_exists('curl_init')) {
+            $disabled = ini_get('disable_functions');
+            throw new Exception(_t('cURL 扩展已加载，但初始化方法不可用（可能被禁用）：') . ($disabled ?: 'unknown'));
+        }
+        Helper::addAction('Comment2MailGun', __NAMESPACE__ . '\Action');
+        \Typecho\Plugin::factory('Widget_Feedback')->finishComment = array('Comment2MailGun_Plugin', 'toMail');
+
+        return _t('请到设置面板正确配置 MailGun 令牌才可正常工作');
     }
 
     /**
      * 禁用插件方法,如果禁用失败,直接抛出异常
      *
-     * @static
      * @access public
      * @return void
-     * @throws Typecho_Plugin_Exception
      */
-    public static function deactivate() {
-        Helper::removeAction('comment-mail-plus');
+    public static function deactivate(): void
+    {
+        Helper::removeAction('Comment2MailGun');
     }
 
     /**
      * 获取插件配置面板
      *
      * @access public
-     * @param Typecho_Widget_Helper_Form $form 配置面板
+     * @param Form $form 配置面板
      * @return void
      */
-    public static function config(Typecho_Widget_Helper_Form $form) {
-        $mail = new Typecho_Widget_Helper_Form_Element_Text('mail', NULL, NULL,
-                _t('收件人邮箱'),_t('接收邮件用的信箱，为空则使用文章作者个人设置中的邮箱！'));
+    public static function config(Form $form): void
+    {
+        $mail = new Text('mail', null, null,
+                _t('收件人邮箱'),_t('接收邮件用的信箱，为空则使用文章作者个人设置中的默认邮箱'));
         $form->addInput($mail->addRule('email', _t('请填写正确的邮箱！')));
 
-        $status = new Typecho_Widget_Helper_Form_Element_Checkbox('status',
+        $status = new Checkbox('status',
                 array('approved' => '提醒已通过评论',
                         'waiting' => '提醒待审核评论',
                         'spam' => '提醒垃圾评论'),
                 array('approved', 'waiting'), '提醒设置',_t('该选项仅针对博主，访客只发送已通过的评论。'));
         $form->addInput($status);
 
-        $other = new Typecho_Widget_Helper_Form_Element_Checkbox('other',
+        $other = new Checkbox('other',
                 array('to_owner' => '有评论及回复时，发邮件通知博主',
                     'to_guest' => '评论被回复时，发邮件通知评论者',
                     'to_me'=>'自己回复自己的评论时（同时针对博主和访客），发邮件通知',
                     'to_log' => '记录邮件发送日志'),
-                array('to_owner','to_guest'), '其他设置',_t('如果勾选“记录邮件发送日志”选项，则会在 ./Comment2MailGun/logs/mail_log.php 中记录发送信息。<br />
-                    关键性错误日志将自动记录到 ./Comment2MailGun/logs/error_log.php 中。<br />
-                    '));
+                array('to_owner','to_guest'), '其他设置',_t('如果勾选“记录邮件发送日志”选项，则会在插件根目录 logs/mail_log.php 中记录邮件发送信息。<br>
+                    关键性错误日志将自动记录到 logs/error_log.php 中。'));
         $form->addInput($other->multiMode());
-        $key = new Typecho_Widget_Helper_Form_Element_Text('key', NULL, 'xxxxxxxxxxxxxxxxxxx-xxxxxx-xxxxxx',
+
+        $key = new Text('key', null, 'xxxxxxxxxxxxxxxxxxx-xxxxxx-xxxxxx',
                 _t('MailGun API 密钥'), _t('请填写在<a href="https://mailgun.com/"> MailGun </a>申请的密钥，可在<a href="https://app.mailgun.com/app/account/security/api_keys">个人页</a>中查看 '));
         $form->addInput($key->addRule('required', _t('密钥不能为空')));
-        $domain = new Typecho_Widget_Helper_Form_Element_Text('domain', NULL, 'samples.mailgun.org',
+
+        $domain = new Text('domain', null, 'samples.mailgun.org',
                 _t('MailGun 域名'), _t('请填写您的邮件域名，若使用官方提供的测试域名可能存在其他问题'));
         $form->addInput($domain->addRule('required', _t('邮件域名不能为空')));
-        $mailAddress = new Typecho_Widget_Helper_Form_Element_Text('mailAddress', NULL, 'no-reply@samples.mailgun.org',
+
+        $mailAddress = new Text('mailAddress', null, 'no-reply@samples.mailgun.org',
                 _t('发件人邮箱'));
         $form->addInput($mailAddress->addRule('required', _t('发件人地址不能为空')));
-        $senderName = new Typecho_Widget_Helper_Form_Element_Text('senderName', NULL, '评论提醒',
+
+        $senderName = new Text('senderName', null, '评论提醒',
                 _t('发件人显示名'));
         $form->addInput($senderName);
 
-        $titleForOwner = new Typecho_Widget_Helper_Form_Element_Text('titleForOwner',null,"[{site}]:《{title}》有新的评论",
+        $titleForOwner = new Text('titleForOwner',null,"[{site}]:《{title}》有新的评论",
                 _t('博主接收邮件标题'));
         $form->addInput($titleForOwner);
 
-        $titleForGuest = new Typecho_Widget_Helper_Form_Element_Text('titleForGuest',null,"[{site}]:您在《{title}》的评论有了回复",
+        $titleForGuest = new Text('titleForGuest',null,"[{site}]:您在《{title}》的评论有了回复",
                 _t('访客接收邮件标题'));
         $form->addInput($titleForGuest);
     }
@@ -89,12 +113,10 @@ class Comment2MailGun_Plugin implements Typecho_Plugin_Interface {
     /**
      * 个人用户的配置面板
      *
-     * @access public
-     * @param Typecho_Widget_Helper_Form $form
-     * @return void
+     * @param Form $form
      */
-    public static function personalConfig(Typecho_Widget_Helper_Form $form) {
-
+    public static function personalConfig(Form $form)
+    {
     }
 
     /**
@@ -103,11 +125,14 @@ class Comment2MailGun_Plugin implements Typecho_Plugin_Interface {
      * @access public
      * @param $post
      * @return void
+     * @throws Exception
+     * @throws \Typecho\Db\Exception
      */
-    public static function toMail($post) {
+    public static function toMail($post): void
+    {
         //发送邮件
-        $settings=Helper::options()->plugin('Comment2MailGun');
-        $options = Typecho_Widget::widget('Widget_Options');
+        $options = Helper::options();
+        $settings = $options->plugin('Comment2MailGun');
         //邮件模板变量
         $tempInfo['site']          = $options->title;
         $tempInfo['siteUrl']       = $options->siteUrl;
@@ -121,15 +146,14 @@ class Comment2MailGun_Plugin implements Typecho_Plugin_Interface {
         $tempInfo['ownerId']       = $post->ownerId;
         $tempInfo['mail']          = $post->mail;
         $tempInfo['ip']            = $post->ip;
-        $tempInfo['title']         = $post->title;
         $tempInfo['text']          = $post->text;
         $tempInfo['permalink']     = $post->permalink;
         $tempInfo['status']        = $post->status;
         $tempInfo['parent']        = $post->parent;
-        $tempInfo['manage']        = $options->siteUrl."admin/manage-comments.php";
+        $tempInfo['manage']        = $options->siteUrl . "admin/manage-comments.php";
         $tempInfo['currentYear']   = date('Y');
-        $_db = Typecho_Db::get();
-        $original = $_db->fetchRow($_db::get()->select('author', 'mail', 'text')
+        $db = \Typecho\Db::get();
+        $original = $db->fetchRow($db->select('author', 'mail', 'text')
                     ->from('table.comments')
                     ->where('coid = ?', $tempInfo['parent']));
         //var_dump($original);die();
@@ -140,8 +164,8 @@ class Comment2MailGun_Plugin implements Typecho_Plugin_Interface {
         if(in_array('to_owner', $settings->other) && in_array($tempInfo['status'], $settings->status)){
             $this_mail = $tempInfo['mail'];
             $to_mail = $settings->mail;
-            if(!$to_mail){
-                Typecho_Widget::widget('Widget_Users_Author@' . $tempInfo['cid'], array('uid' => $tempInfo['authorId']))->to($user);
+            if (!$to_mail) {
+                $user = \Widget\Users\Author::allocWithAlias((string) $tempInfo['cid'], ['uid' => $tempInfo['authorId']]);
                 $to_mail = $user->mail;
             }
             if($this_mail != $to_mail || in_array('to_me',$settings->other)){
@@ -191,6 +215,7 @@ class Comment2MailGun_Plugin implements Typecho_Plugin_Interface {
         if (!empty($yiyan['hitokoto'])) {
             return $yiyan;
         }
+        return null;
     }
     public static function _getHtml($toGuest,$tempInfo){
         //获取发送模板
@@ -215,7 +240,9 @@ class Comment2MailGun_Plugin implements Typecho_Plugin_Interface {
         $html = file_get_contents($dir);
         return str_replace($search, $replace, $html);
     }
-    public static function _sendMail($to_mail,$from_mail,$title,$body,$settings){
+
+    public static function _sendMail($to_mail,$from_mail,$title,$body,$settings)
+    {
         //发送邮件
         //self::_log($to_mail,'debug');return;
         $api_key = $settings->key;
