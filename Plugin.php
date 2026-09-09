@@ -66,55 +66,55 @@ class Plugin implements PluginInterface
     public static function config(Form $form): void
     {
         $mail = new Text('mail', null, null,
-                _t('收件人邮箱'),_t('接收邮件用的信箱，为空则使用文章作者个人设置中的默认邮箱'));
+            _t('收件人邮箱'), _t('接收邮件用的信箱，为空则使用文章作者个人设置中的默认邮箱'));
         $form->addInput($mail->addRule('email', _t('请填写正确的邮箱！')));
 
         $status = new Checkbox('status',
-                array('approved' => '提醒已通过评论',
-                        'waiting' => '提醒待审核评论',
-                        'spam' => '提醒垃圾评论'),
-                array('approved', 'waiting'), '提醒设置',_t('该选项仅针对博主，访客只发送已通过的评论。'));
+            array('approved' => '提醒已通过评论',
+                'waiting' => '提醒待审核评论',
+                'spam' => '提醒垃圾评论'),
+            array('approved', 'waiting'), '提醒设置', _t('该选项仅针对博主，访客只发送已通过的评论。'));
         $form->addInput($status);
 
         $other = new Checkbox('other',
-                array('to_owner' => '有评论及回复时，发邮件通知博主',
-                    'to_guest' => '评论被回复时，发邮件通知评论者',
-                    'to_me'=>'自己回复自己的评论时（同时针对博主和访客），发邮件通知',
-                    'to_log' => '记录邮件发送日志'),
-                array('to_owner','to_guest'), '其他设置',_t('如果勾选“记录邮件发送日志”选项，则会在插件根目录 logs/mail_log.php 中记录邮件发送信息。<br>
+            array('to_owner' => '有评论及回复时，发邮件通知博主',
+                'to_guest' => '评论被回复时，发邮件通知评论者',
+                'to_me' => '自己回复自己的评论时（同时针对博主和访客），发邮件通知',
+                'to_log' => '记录邮件发送日志'),
+            array('to_owner', 'to_guest'), '其他设置', _t('如果勾选“记录邮件发送日志”选项，则会在插件根目录 logs/mail_log.php 中记录邮件发送信息。<br>
                     关键性错误日志将自动记录到 logs/error_log.php 中；插件目录只读时将降级到系统临时目录。'));
         $form->addInput($other->multiMode());
 
         $key = new Text('key', null, 'xxxxxxxxxxxxxxxxxxx-xxxxxx-xxxxxx',
-                _t('MailGun API 密钥'), _t('请填写在<a href="https://mailgun.com/"> MailGun </a>申请的密钥，可在<a href="https://app.mailgun.com/app/account/security/api_keys">个人页</a>中查看 '));
+            _t('MailGun API 密钥'), _t('请填写在<a href="https://mailgun.com/"> MailGun </a>申请的密钥，可在<a href="https://app.mailgun.com/app/account/security/api_keys">个人页</a>中查看 '));
         $form->addInput($key->addRule('required', _t('密钥不能为空')));
 
         $domain = new Text('domain', null, 'samples.mailgun.org',
-                _t('MailGun 域名'), _t('请填写您的邮件域名，若使用官方提供的测试域名可能存在其他问题'));
+            _t('MailGun 域名'), _t('请填写您的邮件域名，若使用官方提供的测试域名可能存在其他问题'));
         $form->addInput($domain
-                ->addRule('required', _t('邮件域名不能为空'))
-                ->addRule(
-                    'regexp',
-                    _t('请填写正确的邮件域名，例如 mg.example.com'),
-                    '/^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/i'
-                ));
+            ->addRule('required', _t('邮件域名不能为空'))
+            ->addRule(
+                'regexp',
+                _t('请填写正确的邮件域名，例如 mg.example.com'),
+                '/^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/i'
+            ));
 
         $mailAddress = new Text('mailAddress', null, 'no-reply@samples.mailgun.org',
-                _t('发件人邮箱'));
+            _t('发件人邮箱'));
         $form->addInput($mailAddress
-                ->addRule('required', _t('发件人地址不能为空'))
-                ->addRule('email', _t('请填写正确的发件人邮箱')));
+            ->addRule('required', _t('发件人地址不能为空'))
+            ->addRule('email', _t('请填写正确的发件人邮箱')));
 
         $senderName = new Text('senderName', null, '评论提醒',
-                _t('发件人显示名'));
+            _t('发件人显示名'));
         $form->addInput($senderName);
 
-        $titleForOwner = new Text('titleForOwner',null,"[{site}]:《{title}》有新的评论",
-                _t('博主接收邮件标题'));
+        $titleForOwner = new Text('titleForOwner', null, "[{site}]:《{title}》有新的评论",
+            _t('博主接收邮件标题'));
         $form->addInput($titleForOwner);
 
-        $titleForGuest = new Text('titleForGuest',null,"[{site}]:您在《{title}》的评论有了回复",
-                _t('访客接收邮件标题'));
+        $titleForGuest = new Text('titleForGuest', null, "[{site}]:您在《{title}》的评论有了回复",
+            _t('访客接收邮件标题'));
         $form->addInput($titleForGuest);
     }
 
@@ -132,15 +132,18 @@ class Plugin implements PluginInterface
      *
      * @access public
      * @param $post
-     * @return void
+     * @return bool
      * @throws Exception
      * @throws \Typecho\Db\Exception
      */
-    public static function toMail($post): void
+    public static function toMail($post): bool
     {
         //发送邮件
         $options = Helper::options();
         $settings = $options->plugin('Comment2MailGun');
+        $other = (array)$settings->other;
+        $statuses = (array)$settings->status;
+        $success = true;
         //邮件模板变量
         $tempInfo['site']          = $options->title;
         $tempInfo['siteUrl']       = $options->siteUrl;
@@ -162,14 +165,14 @@ class Plugin implements PluginInterface
         $tempInfo['currentYear']   = date('Y');
         $db = \Typecho\Db::get();
         $original = $db->fetchRow($db->select('author', 'mail', 'text')
-                    ->from('table.comments')
-                    ->where('coid = ? AND cid = ?', $tempInfo['parent'], $tempInfo['cid']));
+            ->from('table.comments')
+            ->where('coid = ? AND cid = ?', $tempInfo['parent'], $tempInfo['cid']));
         //var_dump($original);die();
 
         //判断发送
         //1.发送博主邮件
         //无需判断，先发为敬。
-        if(in_array('to_owner', $settings->other) && in_array($tempInfo['status'], $settings->status)){
+        if (in_array('to_owner', $other, true) && in_array($tempInfo['status'], $statuses, true)) {
             $this_mail = $tempInfo['mail'];
             $to_mail = $settings->mail;
             if (!$to_mail) {
@@ -179,29 +182,40 @@ class Plugin implements PluginInterface
                 );
                 $to_mail = $user->mail;
             }
-            if($this_mail != $to_mail || in_array('to_me',$settings->other)){
+            if (!self::_sameEmail($this_mail, $to_mail) || in_array('to_me', $other, true)) {
                 //判定可以发送邮件
                 $from_mail = $settings->mailAddress;
-                $title = self::_getTitle(false,$settings,$tempInfo);
-                $body = self::_getHtml(false,$tempInfo);
-                self::_sendMail($to_mail,$from_mail,$title,$body,$settings);
+                $title = self::_getTitle(false, $settings, $tempInfo);
+                $body = self::_getHtml(false, $tempInfo);
+                if (!self::_sendMail($to_mail, $from_mail, $title, $body, $settings)) {
+                    $success = false;
+                }
             }
         }
         //2.发送评论者邮件
         //判断是否为回复评论，是则发，否则跳。
-        if (!empty($original)){
+        if (!empty($original)) {
             $tempInfo['originalMail'] = $original['mail'];
             $tempInfo['originalText'] = $original['text'];
             $tempInfo['originalAuthor'] = $original['author'];
-            if(in_array('to_guest', $settings->other) && 'approved'==$tempInfo['status'] && $tempInfo['originalMail']){
+            $isSelfReply = self::_sameEmail($tempInfo['mail'], $tempInfo['originalMail']);
+            if (
+                in_array('to_guest', $other, true)
+                && 'approved' === $tempInfo['status']
+                && $tempInfo['originalMail']
+                && (!$isSelfReply || in_array('to_me', $other, true))
+            ) {
                 $to_mail = $tempInfo['originalMail'];
                 $from_mail = $settings->mailAddress;
-                $title = self::_getTitle(true,$settings,$tempInfo);
-                $body = self::_getHtml(true,$tempInfo);
-                self::_sendMail($to_mail,$from_mail,$title,$body,$settings);
+                $title = self::_getTitle(true, $settings, $tempInfo);
+                $body = self::_getHtml(true, $tempInfo);
+                if (!self::_sendMail($to_mail, $from_mail, $title, $body, $settings)) {
+                    $success = false;
+                }
             }
         }
 
+        return $success;
     }
 
     /**
@@ -256,7 +270,7 @@ class Plugin implements PluginInterface
 
         return [
             'hitokoto' => (string)$yiyan['hitokoto'],
-            'from'     => (string)($yiyan['from'] ?? ''),
+            'from' => (string)($yiyan['from'] ?? ''),
         ];
     }
 
@@ -362,6 +376,16 @@ class Plugin implements PluginInterface
     }
 
     /**
+     * 不区分大小写比较两个非空邮箱地址
+     */
+    private static function _sameEmail($first, $second): bool
+    {
+        $first = trim((string)$first);
+        $second = trim((string)$second);
+        return $first !== '' && $second !== '' && strcasecmp($first, $second) === 0;
+    }
+
+    /**
      * 邮件发送方法
      *
      * @access public
@@ -383,7 +407,7 @@ class Plugin implements PluginInterface
                 $domain
             )
         ) {
-            self::_log('邮件发送失败：收件人、发件人或 MailGun 域名格式错误');
+            self::_reportError('邮件发送失败：收件人、发件人或 MailGun 域名格式错误');
             return false;
         }
 
@@ -417,7 +441,7 @@ class Plugin implements PluginInterface
         curl_close($ch);
 
         if (!is_string($result)) {
-            self::_log('邮件发送失败：网络请求错误（' . $curlError . '）');
+            self::_reportError('邮件发送失败：网络请求错误（' . $curlError . '）');
             return false;
         }
 
@@ -427,12 +451,22 @@ class Plugin implements PluginInterface
             : 'MailGun 未返回有效消息';
 
         if ($statusCode < 200 || $statusCode >= 300) {
-            self::_log('邮件发送失败：MailGun HTTP ' . $statusCode . '（' . $message . '）');
+            self::_reportError('邮件发送失败：MailGun HTTP ' . $statusCode . '（' . $message . '）');
             return false;
         }
 
         self::_log($toMail . ' Sending: ' . $message, 'mail');
         return true;
+    }
+
+    /**
+     * 记录发送错误；插件日志不可用时降级到 PHP 系统错误日志
+     */
+    private static function _reportError(string $message): void
+    {
+        if (!self::_log($message, 'error')) {
+            error_log('[Comment2MailGun] ' . $message);
+        }
     }
 
     /**
