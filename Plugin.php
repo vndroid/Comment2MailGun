@@ -39,7 +39,6 @@ class Plugin implements PluginInterface
             $disabled = ini_get('disable_functions');
             throw new Exception(_t('cURL 扩展已加载，但初始化方法不可用（可能被禁用）：') . ($disabled ?: 'unknown'));
         }
-        Helper::addAction('Comment2MailGun', __NAMESPACE__ . '\Action');
         \Typecho\Plugin::factory('Widget_Feedback')->finishComment = array('Comment2MailGun_Plugin', 'toMail');
 
         return _t('请到设置面板正确配置 MailGun 令牌才可正常工作');
@@ -53,6 +52,7 @@ class Plugin implements PluginInterface
      */
     public static function deactivate(): void
     {
+        // 清理旧版本曾注册的无效 Action 路由
         Helper::removeAction('Comment2MailGun');
     }
 
@@ -91,11 +91,19 @@ class Plugin implements PluginInterface
 
         $domain = new Text('domain', null, 'samples.mailgun.org',
                 _t('MailGun 域名'), _t('请填写您的邮件域名，若使用官方提供的测试域名可能存在其他问题'));
-        $form->addInput($domain->addRule('required', _t('邮件域名不能为空')));
+        $form->addInput($domain
+                ->addRule('required', _t('邮件域名不能为空'))
+                ->addRule(
+                    'regexp',
+                    _t('请填写正确的邮件域名，例如 mg.example.com'),
+                    '/^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/i'
+                ));
 
         $mailAddress = new Text('mailAddress', null, 'no-reply@samples.mailgun.org',
                 _t('发件人邮箱'));
-        $form->addInput($mailAddress->addRule('required', _t('发件人地址不能为空')));
+        $form->addInput($mailAddress
+                ->addRule('required', _t('发件人地址不能为空'))
+                ->addRule('email', _t('请填写正确的发件人邮箱')));
 
         $senderName = new Text('senderName', null, '评论提醒',
                 _t('发件人显示名'));
