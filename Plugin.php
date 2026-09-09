@@ -128,17 +128,59 @@ class Plugin implements PluginInterface
     }
 
     /**
-     * 组合邮件内容
+     * 延迟发送评论通知，避免阻塞前台评论响应
      *
      * @access public
      * @param $post
      * @return bool
-     * @throws Exception
-     * @throws \Typecho\Db\Exception
      */
     public static function toMail($post): bool
     {
-        //发送邮件
+        // 仅保留发送所需的标量数据，避免 shutdown 阶段依赖可变的 Widget 状态
+        $comment = (object)[
+            'title' => $post->title,
+            'cid' => $post->cid,
+            'coid' => $post->coid,
+            'created' => $post->created,
+            'author' => $post->author,
+            'authorId' => $post->authorId,
+            'ownerId' => $post->ownerId,
+            'mail' => $post->mail,
+            'ip' => $post->ip,
+            'text' => $post->text,
+            'permalink' => $post->permalink,
+            'status' => $post->status,
+            'parent' => $post->parent,
+        ];
+
+        register_shutdown_function(static function () use ($comment): void {
+            ignore_user_abort(true);
+            try {
+                if (function_exists('fastcgi_finish_request')) {
+                    fastcgi_finish_request();
+                }
+
+                if (!self::_sendNotifications($comment)) {
+                    error_log('[Comment2MailGun] 本次延迟通知未全部发送成功');
+                }
+            } catch (\Throwable $e) {
+                error_log('[Comment2MailGun] 延迟发送异常：' . $e->getMessage());
+            }
+        });
+
+        return true;
+    }
+
+    /**
+     * 组合并发送邮件内容
+     *
+     * @param object $post
+     * @return bool 所有计划发送的邮件均成功时返回 true
+     * @throws Exception
+     * @throws \Typecho\Db\Exception
+     */
+    private static function _sendNotifications(object $post): bool
+    {
         $options = Helper::options();
         $settings = $options->plugin('Comment2MailGun');
         $other = (array)$settings->other;

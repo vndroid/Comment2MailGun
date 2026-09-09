@@ -13,6 +13,12 @@
 
 Typecho 后台“管理评论”页面中的回复不在本插件的通知范围内，这是插件的设计行为，不是发送故障。
 
+## 发送方式
+
+在 PHP-FPM/FastCGI 环境中，插件会先完成评论响应，再通过 `fastcgi_finish_request()` 延迟发送邮件，访客无需等待 MailGun 请求完成。
+
+这种方式不依赖常驻队列进程，但发送期间仍会占用当前 PHP-FPM Worker；在不支持 `fastcgi_finish_request()` 的环境中，会退化为请求结束阶段同步执行。
+
 ## 兼容性
 
 - PHP 8.0+
