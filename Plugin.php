@@ -32,6 +32,10 @@ class Plugin implements PluginInterface
      */
     public static function activate(): string
     {
+        if (PHP_VERSION_ID < 80200) {
+            throw new Exception(_t('Comment2MailGun 要求 PHP 8.2 或更高版本，当前版本为：') . PHP_VERSION);
+        }
+
         if (!extension_loaded('curl')) {
             throw new Exception(_t('检测到当前 PHP 环境没有 cURL 组件, 无法正常使用此插件'));
         }
