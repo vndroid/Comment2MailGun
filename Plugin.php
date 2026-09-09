@@ -82,7 +82,7 @@ class Plugin implements PluginInterface
                     'to_me'=>'自己回复自己的评论时（同时针对博主和访客），发邮件通知',
                     'to_log' => '记录邮件发送日志'),
                 array('to_owner','to_guest'), '其他设置',_t('如果勾选“记录邮件发送日志”选项，则会在插件根目录 logs/mail_log.php 中记录邮件发送信息。<br>
-                    关键性错误日志将自动记录到 logs/error_log.php 中。'));
+                    关键性错误日志将自动记录到 logs/error_log.php 中；插件目录只读时将降级到系统临时目录。'));
         $form->addInput($other->multiMode());
 
         $key = new Text('key', null, 'xxxxxxxxxxxxxxxxxxx-xxxxxx-xxxxxx',
@@ -163,7 +163,7 @@ class Plugin implements PluginInterface
         $db = \Typecho\Db::get();
         $original = $db->fetchRow($db->select('author', 'mail', 'text')
                     ->from('table.comments')
-                    ->where('coid = ?', $tempInfo['parent']));
+                    ->where('coid = ? AND cid = ?', $tempInfo['parent'], $tempInfo['cid']));
         //var_dump($original);die();
 
         //判断发送
@@ -173,7 +173,10 @@ class Plugin implements PluginInterface
             $this_mail = $tempInfo['mail'];
             $to_mail = $settings->mail;
             if (!$to_mail) {
-                $user = \Widget\Users\Author::allocWithAlias((string) $tempInfo['cid'], ['uid' => $tempInfo['authorId']]);
+                $user = \Widget\Users\Author::allocWithAlias(
+                    'comment2mailgun_owner_' . $tempInfo['ownerId'],
+                    ['uid' => $tempInfo['ownerId']]
+                );
                 $to_mail = $user->mail;
             }
             if($this_mail != $to_mail || in_array('to_me',$settings->other)){
@@ -213,7 +216,8 @@ class Plugin implements PluginInterface
     public static function _getTitle(bool $toGuest, $settings, array $tempInfo): string
     {
         $title = (string)($toGuest ? $settings->titleForGuest : $settings->titleForOwner);
-        return str_replace(['{title}', '{site}'], [$tempInfo['title'], $tempInfo['site']], $title);
+        $title = str_replace(['{title}', '{site}'], [$tempInfo['title'], $tempInfo['site']], $title);
+        return trim(str_replace(["\r", "\n"], ' ', $title));
     }
 
     /**
@@ -226,16 +230,22 @@ class Plugin implements PluginInterface
     {
         $url = 'https://international.v1.hitokoto.cn/';
         $yy = curl_init();
-        curl_setopt($yy, CURLOPT_SSL_VERIFYPEER, false);
-        curl_setopt($yy, CURLOPT_SSL_VERIFYHOST, false);
-        curl_setopt($yy, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($yy, CURLOPT_URL, $url);
+        curl_setopt_array($yy, [
+            CURLOPT_SSL_VERIFYPEER => true,
+            CURLOPT_SSL_VERIFYHOST => 2,
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_CONNECTTIMEOUT => 3,
+            CURLOPT_TIMEOUT => 5,
+            CURLOPT_PROTOCOLS => CURLPROTO_HTTPS,
+            CURLOPT_URL => $url,
+        ]);
         $result = curl_exec($yy);
+        $statusCode = (int)curl_getinfo($yy, CURLINFO_RESPONSE_CODE);
         curl_close($yy);
 
         $fallback = ['hitokoto' => '', 'from' => ''];
 
-        if (!is_string($result) || empty($result)) {
+        if (!is_string($result) || empty($result) || $statusCode < 200 || $statusCode >= 300) {
             return $fallback;
         }
 
@@ -267,7 +277,21 @@ class Plugin implements PluginInterface
             $dir .= 'guest.html';
             $yiyan = self::_hitokoto();
             $search = array('{site}', '{siteUrl}', '{title}', '{originAuthor}', '{author}', '{mail}', '{permaLink}', '{repyComment}', '{myComment}', '{currentYear}', '{time}', '{yiyanBody}', '{yiyanFrom}');
-            $replace = array($tempInfo['site'], $tempInfo['siteUrl'], $tempInfo['title'], $tempInfo['originalAuthor'], $tempInfo['author'], $tempInfo['mail'], $tempInfo['permalink'], $tempInfo['text'], $tempInfo['originalText'], $tempInfo['currentYear'], $time, $yiyan['hitokoto'], $yiyan['from']);
+            $replace = array(
+                self::_escapeHtml($tempInfo['site']),
+                self::_escapeUrl($tempInfo['siteUrl']),
+                self::_escapeHtml($tempInfo['title']),
+                self::_escapeHtml($tempInfo['originalAuthor']),
+                self::_escapeHtml($tempInfo['author']),
+                self::_escapeEmail($tempInfo['mail']),
+                self::_escapeUrl($tempInfo['permalink']),
+                self::_escapeText($tempInfo['text']),
+                self::_escapeText($tempInfo['originalText']),
+                self::_escapeHtml($tempInfo['currentYear']),
+                self::_escapeHtml($time),
+                self::_escapeHtml($yiyan['hitokoto']),
+                self::_escapeHtml($yiyan['from']),
+            );
         } else {
             $dir .= 'owner.html';
             $status = array(
@@ -276,7 +300,20 @@ class Plugin implements PluginInterface
                 "spam" => '垃圾'
             );
             $search = array('{site}', '{siteUrl}', '{title}', '{author}', '{ip}', '{mail}', '{permaLink}', '{manage}', '{comment}', '{currentYear}', '{time}', '{status}');
-            $replace = array($tempInfo['site'], $tempInfo['siteUrl'], $tempInfo['title'], $tempInfo['author'], $tempInfo['ip'], $tempInfo['mail'], $tempInfo['permalink'], $tempInfo['manage'], $tempInfo['text'], $tempInfo['currentYear'], $time, $status[$tempInfo['status']]);
+            $replace = array(
+                self::_escapeHtml($tempInfo['site']),
+                self::_escapeUrl($tempInfo['siteUrl']),
+                self::_escapeHtml($tempInfo['title']),
+                self::_escapeHtml($tempInfo['author']),
+                self::_escapeHtml($tempInfo['ip']),
+                self::_escapeEmail($tempInfo['mail']),
+                self::_escapeUrl($tempInfo['permalink']),
+                self::_escapeUrl($tempInfo['manage']),
+                self::_escapeText($tempInfo['text']),
+                self::_escapeHtml($tempInfo['currentYear']),
+                self::_escapeHtml($time),
+                self::_escapeHtml($status[$tempInfo['status']]),
+            );
         }
         $html = file_get_contents($dir);
         if ($html === false) {
@@ -286,41 +323,116 @@ class Plugin implements PluginInterface
     }
 
     /**
+     * 转义 HTML 文本节点
+     */
+    private static function _escapeHtml($value): string
+    {
+        return htmlspecialchars((string)$value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+    }
+
+    /**
+     * 转义多行纯文本并保留换行
+     */
+    private static function _escapeText($value): string
+    {
+        return nl2br(self::_escapeHtml($value), false);
+    }
+
+    /**
+     * 校验并转义 HTML 链接
+     */
+    private static function _escapeUrl($value): string
+    {
+        $url = trim((string)$value);
+        $scheme = strtolower((string)parse_url($url, PHP_URL_SCHEME));
+        if (filter_var($url, FILTER_VALIDATE_URL) === false || !in_array($scheme, ['http', 'https'], true)) {
+            return '#';
+        }
+
+        return self::_escapeHtml($url);
+    }
+
+    /**
+     * 校验并转义邮件地址
+     */
+    private static function _escapeEmail($value): string
+    {
+        $mail = trim((string)$value);
+        return filter_var($mail, FILTER_VALIDATE_EMAIL) === false ? '' : self::_escapeHtml($mail);
+    }
+
+    /**
      * 邮件发送方法
      *
      * @access public
-     * @throws Exception
+     * @return bool
      */
-    public static function _sendMail($to_mail, $from_mail, $title, $body, $settings): void
+    public static function _sendMail($to_mail, $from_mail, $title, $body, $settings): bool
     {
-        //self::_log($to_mail,'debug');return;
-        $api_key = $settings->key;
-        $domain = $settings->domain;
-        $from_mail = $settings->senderName . ' <' . $from_mail . '>';
+        // self::_log($to_mail, 'debug'); return true;
+        $apiKey = (string)$settings->key;
+        $domain = trim((string)$settings->domain);
+        $toMail = trim((string)$to_mail);
+        $fromMail = trim((string)$from_mail);
+
+        if (
+            filter_var($toMail, FILTER_VALIDATE_EMAIL) === false
+            || filter_var($fromMail, FILTER_VALIDATE_EMAIL) === false
+            || !preg_match(
+                '/^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/i',
+                $domain
+            )
+        ) {
+            self::_log('邮件发送失败：收件人、发件人或 MailGun 域名格式错误');
+            return false;
+        }
+
+        $senderName = trim(str_replace(["\r", "\n"], '', (string)$settings->senderName));
+        $senderName = str_replace(['\\', '"'], ['\\\\', '\\"'], $senderName);
+        $from = '"' . $senderName . '" <' . $fromMail . '>';
         $postData = array(
-            'from' => $from_mail,
-            'to' => $to_mail,
-            'subject' => $title,
-            'html' => $body,
+            'from' => $from,
+            'to' => $toMail,
+            'subject' => (string)$title,
+            'html' => (string)$body,
         );
-        $url = 'https://api.mailgun.net/v3/' . $domain . '/messages';
+        $url = 'https://api.mailgun.net/v3/' . rawurlencode($domain) . '/messages';
         $ch = curl_init();
-        curl_setopt($ch, CURLOPT_USERPWD, 'api:' . $api_key);
-        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-        curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_POST, true);
-        curl_setopt($ch, CURLOPT_URL, $url);
-        curl_setopt($ch, CURLOPT_POSTFIELDS, $postData);
-        curl_setopt($ch, CURLOPT_HEADER, true);
-        self::_log('curl preparing...' . print_r(curl_getinfo($ch), 1), 'debug');
+        curl_setopt_array($ch, [
+            CURLOPT_USERPWD => 'api:' . $apiKey,
+            CURLOPT_SSL_VERIFYPEER => true,
+            CURLOPT_SSL_VERIFYHOST => 2,
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_POST => true,
+            CURLOPT_URL => $url,
+            CURLOPT_POSTFIELDS => $postData,
+            CURLOPT_CONNECTTIMEOUT => 5,
+            CURLOPT_TIMEOUT => 15,
+            CURLOPT_PROTOCOLS => CURLPROTO_HTTPS,
+        ]);
+
         $result = curl_exec($ch);
-        self::_log('API return...' . $result, 'debug');
-        $headerSize = curl_getinfo($ch, CURLINFO_HEADER_SIZE);
-        $result = substr($result, $headerSize);
-        $res = json_decode($result, 1);
-        self::_log('curl executed...' . print_r(curl_getinfo($ch), 1), 'debug');
-        self::_log($to_mail . ' ' . 'Sending: ' . $res['message']);
+        $curlError = curl_error($ch);
+        $statusCode = (int)curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
+        curl_close($ch);
+
+        if (!is_string($result)) {
+            self::_log('邮件发送失败：网络请求错误（' . $curlError . '）');
+            return false;
+        }
+
+        $response = json_decode($result, true);
+        $message = is_array($response) && isset($response['message'])
+            ? (string)$response['message']
+            : 'MailGun 未返回有效消息';
+
+        if ($statusCode < 200 || $statusCode >= 300) {
+            self::_log('邮件发送失败：MailGun HTTP ' . $statusCode . '（' . $message . '）');
+            return false;
+        }
+
+        self::_log($toMail . ' Sending: ' . $message, 'mail');
+        return true;
     }
 
     /**
@@ -333,28 +445,67 @@ class Plugin implements PluginInterface
      */
     public static function _log($msg, string $file = 'error'): bool
     {
-        //记录日志
         $settings = Helper::options()->plugin('Comment2MailGun');
-        if (!in_array('to_log', $settings->other)) return false;
-        //开发者模式
-        if ($file === 'debug' && true) return false;
-        $log_dir = dirname(__FILE__) . '/logs';
-        $filename = $log_dir . '/' . $file . '_log.php';
-        //检查日志目录是否存在且可写，不存在则使用临时目录
-        if (!is_dir($log_dir) || !is_writable($log_dir)) {
-            $filename = '/tmp/mailgun_' . $file . '.log';
-        }
-        // 仅 logs 目录下的 .php 文件写入 PHP 头
-        if (str_contains($filename, '_log.php') && !is_file($filename)) {
-            file_put_contents($filename, "<?php \$log = <<<LOG\n");
+        if (!in_array('to_log', (array)$settings->other, true)) {
+            return false;
         }
 
-        $log = @fopen($filename, 'a');
-        if ($log) {
-            fwrite($log, date('[Y-m-d H:i:s]') . ' ' . $msg . PHP_EOL);
-            fclose($log);
-            return true;
+        if (!in_array($file, ['mail', 'error', 'debug'], true)) {
+            return false;
         }
-        return false;
+
+        $log_dir = dirname(__FILE__) . '/logs';
+        if (!is_dir($log_dir) || !is_writable($log_dir)) {
+            $log_dir = rtrim(sys_get_temp_dir(), DIRECTORY_SEPARATOR)
+                . DIRECTORY_SEPARATOR
+                . 'comment2mailgun-'
+                . substr(hash('sha256', __DIR__ . ':' . (string)getmyuid()), 0, 16);
+
+            if (is_link($log_dir)) {
+                return false;
+            }
+
+            if (!is_dir($log_dir) && !@mkdir($log_dir, 0700) && !is_dir($log_dir)) {
+                return false;
+            }
+
+            @chmod($log_dir, 0700);
+            if (!is_writable($log_dir)) {
+                return false;
+            }
+        }
+
+        $filename = $log_dir . '/' . $file . '_log.php';
+        if (is_link($filename)) {
+            return false;
+        }
+
+        $log = @fopen($filename, 'c+');
+        if (!$log || !flock($log, LOCK_EX)) {
+            if ($log) {
+                fclose($log);
+            }
+            return false;
+        }
+
+        $safeHeader = "<?php exit; __halt_compiler(); ?>\n";
+        rewind($log);
+        $prefix = fread($log, strlen($safeHeader));
+        if ($prefix !== $safeHeader) {
+            rewind($log);
+            $existing = stream_get_contents($log);
+            ftruncate($log, 0);
+            rewind($log);
+            fwrite($log, $safeHeader . $existing);
+        }
+
+        $message = str_replace(["\r", "\n"], ['\\r', '\\n'], (string)$msg);
+        fseek($log, 0, SEEK_END);
+        $written = fwrite($log, date('[Y-m-d H:i:s]') . ' ' . $message . PHP_EOL) !== false;
+        fflush($log);
+        flock($log, LOCK_UN);
+        fclose($log);
+
+        return $written;
     }
 }
