@@ -18,7 +18,7 @@ if (!defined('__TYPECHO_ROOT_DIR__')) {
  *
  * @package Comment2MailGun
  * @author Vex
- * @version 1.3.0
+ * @version 1.3.1
  * @link https://github.com/vndroid/Comment2MailGun
  */
 class Plugin implements PluginInterface
@@ -120,6 +120,11 @@ class Plugin implements PluginInterface
         $titleForGuest = new Text('titleForGuest', null, "[{site}]:您在《{title}》的评论有了回复",
             _t('访客接收邮件标题'));
         $form->addInput($titleForGuest);
+
+        $guestInterval = new Text('guestInterval', null, '600',
+            _t('访客通知限流（秒）'),
+            _t('同一邮箱在该时间内最多收到一封回复通知，防止有人冒用他人邮箱评论后借本站刷邮件；填 0 关闭限流'));
+        $form->addInput($guestInterval->addRule('isInteger', _t('请填写整数秒数')));
     }
 
     /**
@@ -210,16 +215,17 @@ class Plugin implements PluginInterface
         $tempInfo['manage']        = $options->siteUrl . "admin/manage-comments.php";
         $tempInfo['currentYear']   = date('Y');
         $db = \Typecho\Db::get();
-        $original = $db->fetchRow($db->select('author', 'mail', 'text')
+        $original = $db->fetchRow($db->select('author', 'mail', 'text', 'status')
             ->from('table.comments')
             ->where('coid = ? AND cid = ?', $tempInfo['parent'], $tempInfo['cid']));
-        //var_dump($original);die();
 
         //判断发送
         //1.发送博主邮件
-        //无需判断，先发为敬。
         if (in_array('to_owner', $other, true) && in_array($tempInfo['status'], $statuses, true)) {
-            $this_mail = $tempInfo['mail'];
+            // 只有「以文章作者身份登录」才算博主本人评论；访客填写的邮箱未经验证，不能用来判断身份，
+            // 否则访客冒用博主邮箱即可让博主收不到提醒
+            $isOwnerSelf = (int)$tempInfo['authorId'] > 0
+                && (int)$tempInfo['authorId'] === (int)$tempInfo['ownerId'];
             $to_mail = $settings->mail;
             if (!$to_mail) {
                 $user = \Widget\Users\Author::allocWithAlias(
@@ -228,7 +234,7 @@ class Plugin implements PluginInterface
                 );
                 $to_mail = $user->mail;
             }
-            if (!self::_sameEmail($this_mail, $to_mail) || in_array('to_me', $other, true)) {
+            if (!$isOwnerSelf || in_array('to_me', $other, true)) {
                 //判定可以发送邮件
                 $from_mail = $settings->mailAddress;
                 $title = self::_getTitle(false, $settings, $tempInfo);
@@ -248,8 +254,11 @@ class Plugin implements PluginInterface
             if (
                 in_array('to_guest', $other, true)
                 && 'approved' === $tempInfo['status']
+                // 被回复的评论本身必须已通过审核：待审/垃圾评论里的邮箱没有经过任何人确认
+                && 'approved' === ($original['status'] ?? null)
                 && $tempInfo['originalMail']
                 && (!$isSelfReply || in_array('to_me', $other, true))
+                && !self::_recentlyNotified($db, (string)$tempInfo['originalMail'], (int)$tempInfo['coid'], $settings)
             ) {
                 $to_mail = $tempInfo['originalMail'];
                 $from_mail = $settings->mailAddress;
@@ -262,6 +271,50 @@ class Plugin implements PluginInterface
         }
 
         return $success;
+    }
+
+    /**
+     * 同一收件人在限流窗口内是否已经收到过回复通知
+     *
+     * 访客邮箱未经验证，任何人都能以他人邮箱发评论再回复它，借本站 MailGun 域名向该邮箱投递内容。
+     * 这里按收件人限流：窗口内若已有更早的、非自回复的已通过回复指向该邮箱的评论，就不再发送。
+     * 判断直接基于评论表，不需要额外存储；并发时以 coid 更小者为准。
+     */
+    private static function _recentlyNotified(\Typecho\Db $db, string $mail, int $currentCoid, $settings): bool
+    {
+        $raw = $settings->guestInterval;
+        $interval = ($raw === null || $raw === '') ? 600 : (int)$raw;
+        if ($interval <= 0 || $mail === '') {
+            return false;
+        }
+
+        $replies = $db->fetchAll($db->select('parent', 'mail')
+            ->from('table.comments')
+            ->where('parent > 0')
+            ->where('status = ?', 'approved')
+            ->where('created >= ?', time() - $interval)
+            ->where('coid < ?', $currentCoid)
+            ->order('coid', \Typecho\Db::SORT_DESC)
+            ->limit(500));
+        if (empty($replies)) {
+            return false;
+        }
+
+        $parentIds = array_values(array_unique(array_map('intval', array_column($replies, 'parent'))));
+        $parents = $db->fetchAll($db->select('coid', 'mail')
+            ->from('table.comments')
+            ->where('coid IN ?', $parentIds));
+        $parentMail = array_column($parents, 'mail', 'coid');
+
+        foreach ($replies as $reply) {
+            $target = $parentMail[(int)$reply['parent']] ?? '';
+            if (self::_sameEmail($target, $mail) && !self::_sameEmail($reply['mail'], $mail)) {
+                self::_log($mail . ' 限流：' . $interval . ' 秒内已通知过，跳过本次回复通知', 'mail');
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
@@ -379,7 +432,9 @@ class Plugin implements PluginInterface
         if ($html === false) {
             return '';
         }
-        return (string)str_replace($search, $replace, $html);
+        // 必须单遍替换：数组形式的 str_replace 会对已替换进去的内容继续替换后续占位符，
+        // 访客把昵称设为 {mail} 即可在通知邮件里拿到回复者的邮箱
+        return strtr($html, array_combine($search, $replace));
     }
 
     /**
