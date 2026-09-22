@@ -124,18 +124,18 @@ class Plugin implements PluginInterface
         $form->addInput($titleForGuest);
 
         $redisEnable = new Radio('redisEnable',
-            ['0' => _t('不启用'), '1' => _t('启用')],
-            '0', _t('Redis 发信限流（可选）'),
+            ['0' => _t('禁用'), '1' => _t('启用')],
+            '0', _t('发信限流策略'),
             _t('<b>用途</b>：访客填写的邮箱未经验证，任何人都能冒用他人邮箱评论后再回复它，借本站的 MailGun 域名向该邮箱投递内容，或者用大量邮箱消耗 MailGun 配额。'
                 . '启用后，下方三项限流以 Redis 原子判定、以<b>实际发送结果</b>为准，并发请求也不会越过额度。<br>'
-                . '<b>代价</b>：需要一台可访问的 Redis 和 PHP redis 扩展；每封邮件发送前后各多一次 Redis 往返（超时 1 秒，在评论响应返回之后执行，不影响访客）；'
+                . '<b>代价</b>：需要可用的 Redis 服务和 PHP redis 扩展；每封邮件发送前后各多一次 Redis 往返（超时 1 秒，在评论响应返回之后执行，不影响访客）；'
                 . '启用后如果 Redis 不可用，<b>访客回复通知会暂停发送</b>并记录错误，博主通知不受影响。<br>'
                 . '<b>不启用时</b>：下方三项限流<b>全部不生效</b>，只保留「被回复的评论必须已通过审核」这一项检查，冒用邮箱刷邮件和配额消耗都无法被严格限制。'
                 . '此时请至少保持 Typecho「评论设置」里的提交间隔和反垃圾保护开启。'));
         $form->addInput($redisEnable);
 
         $redisHost = new Text('redisHost', null, '127.0.0.1', _t('Redis 地址'),
-            _t('需启用 Redis。键名前缀为 <code>plugin:comment2mailgun:{站点指纹}:</code>，可与其他插件、其他站点共用同一个库'));
+            _t('需启用 Redis。键名规则为 <code>plugin:comment2mailgun:{site-fingerprint}:</code>，可与其他插件、其他站点共用同一个库'));
         $form->addInput($redisHost);
 
         $redisPort = new Text('redisPort', null, '6379', _t('Redis 端口'));
